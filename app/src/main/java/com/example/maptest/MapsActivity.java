@@ -31,9 +31,11 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         mapFragment.getMapAsync(this);
 
         //method call to get permission to access device location
+        //checking for ACCESS_FINE_LOCATION
         getPermissionToReadUserLocation();
     }//end onCreate method
 
+    //method that checks for user location permissions
     public void getPermissionToReadUserLocation() {
         // 1) Use the support library version ContextCompat.checkSelfPermission(...) to avoid
         // checking the build version since Context.checkSelfPermission(...) is only available
@@ -60,6 +62,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         }
     }//end method getPermissionToReadUserLocation
 
+    //method that either grants or denies permission requests
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
 
         switch (requestCode) {
@@ -89,11 +92,19 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
      * installed Google Play services and returned to the app.
      */
     public void onMapReady(GoogleMap googleMap) {
+        //initialize map object
         mMap = googleMap;
 
-        // Add a marker for Centennial Mall and move the camera
-        LatLng wku = new LatLng(36.985112, -86.455651);
-        mMap.addMarker(new MarkerOptions().position(wku).title("WKU Main Campus"));
-        mMap.moveCamera(CameraUpdateFactory.newLatLng(wku));
+        //LatLng for a specified location
+        LatLng centennialMall = new LatLng(36.985112, -86.455651);
+
+        //adds a marker on the map with specified LatLng
+        mMap.addMarker(new MarkerOptions().position(centennialMall).title("Centennial Mall - WKU"));
+
+        //Moves the camera to a specified LatLng
+        mMap.moveCamera(CameraUpdateFactory.newLatLng(centennialMall));
+
+        //Zooms the camera in a specified amount. (5, 10, 15, 20)
+        mMap.moveCamera(CameraUpdateFactory.zoomTo(15));
     }
 }
