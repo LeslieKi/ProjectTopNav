@@ -1,13 +1,20 @@
 package com.example.maptest;
 
-import android.Manifest;
+import android.content.IntentSender;
 import android.content.pm.PackageManager;
+import android.location.Location;
 import android.os.Bundle;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentActivity;
 import android.support.v4.content.ContextCompat;
+import android.util.Log;
 import android.widget.Toast;
 
+import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.location.LocationListener;
+import com.google.android.gms.location.LocationRequest;
+import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
@@ -15,9 +22,17 @@ import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MarkerOptions;
 
-public class MapsActivity extends FragmentActivity implements OnMapReadyCallback {
+public class MapsActivity extends FragmentActivity implements OnMapReadyCallback, GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, LocationListener {
 
+    private SupportMapFragment mapFragment;
     private GoogleMap mMap;
+    private GoogleApiClient mGoogleApiClient;
+    private LocationRequest mLocationRequest;
+    public static final String TAG = MapsActivity.class.getSimpleName();
+
+    private long UPDATE_INTERVAL = 10 * 1000; /* 10 secs */
+    private long FASTEST_INTERVAL = 2000; /*2 secs*/
+    private final static int CONNECTION_FAILURE_RESOLUTION_REQUEST = 9000;
 
     //app-defined constant for checking permission cases
     private static final int MY_PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION = 1;
@@ -27,40 +42,101 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         setContentView(R.layout.activity_maps);
 
         // Obtain the SupportMapFragment and get notified when the map is ready to be used.
-        SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map);
+        mapFragment = (SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
+
+        //Create the location client to start receiving updates
+        mGoogleApiClient = new GoogleApiClient.Builder(this)
+                .addApi(LocationServices.API)
+                .addConnectionCallbacks(this)
+                .addOnConnectionFailedListener(this)
+                .build();
+
+        mLocationRequest = LocationRequest.create()
+                .setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY)
+                .setInterval(10 * 1000)        // 10 seconds, in milliseconds
+                .setFastestInterval(1 * 1000); // 1 second, in milliseconds
+
+
 
         //method call to get permission to access device location
         //checking for ACCESS_FINE_LOCATION
-        getPermissionToReadUserLocation();
-    }//end onCreate method
+        //getPermissionToReadUserLocation();
+    }//end onCreate
 
-    //method that checks for user location permissions
-    public void getPermissionToReadUserLocation() {
-        // 1) Use the support library version ContextCompat.checkSelfPermission(...) to avoid
-        // checking the build version since Context.checkSelfPermission(...) is only available
-        // in Marshmallow
-        // 2) Always check for permission (even if permission has already been granted)
-        // since the user can revoke permissions at any time through Settings
+    protected void onResume() {
+        super.onResume();
+       // setUpMapIfNeeded();
+        mGoogleApiClient.connect();
+    }
 
-        //Check if permission has been granted
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
-                != PackageManager.PERMISSION_GRANTED) {
-
-            // Should we show an explanation?
-            if (ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.ACCESS_FINE_LOCATION)) {
-
-                // Show an explanation to the user asynchronously
-                // Don't block this thread waiting for the user's response
-                // After the user sees the explanation, try to request permission again
-
-            } else {
-                // No explanation needed, request the permission
-                ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
-                        MY_PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION);
-            }
+    protected void onPause() {
+        super.onPause();
+        if (mGoogleApiClient.isConnected()) {
+            LocationServices.FusedLocationApi.removeLocationUpdates(mGoogleApiClient, this);
+            mGoogleApiClient.disconnect();
         }
-    }//end method getPermissionToReadUserLocation
+    }
+
+    public void onConnected(Bundle bundle) {
+        Log.i(TAG, "Location services connected.");
+
+        //Get last known recent location
+        if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION}, MY_PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION);
+        }
+
+        Location location = LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient);
+        //Note that this can be null if last location isn't already known
+
+        if (location == null) {
+            Log.d(TAG, "Location null");
+            LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleApiClient, mLocationRequest, this);
+        } else {
+            handleNewLocation(location);
+        }
+
+    }
+
+    private void handleNewLocation(Location location) {
+        Log.d(TAG, location.toString());
+
+        double currentLatitude = location.getLatitude();
+        double currentLongitude = location.getLongitude();
+        LatLng latLng = new LatLng(currentLatitude, currentLongitude);
+
+        MarkerOptions options = new MarkerOptions()
+                .position(latLng)
+                .title("I am here!");
+        mMap.addMarker(options);
+        mMap.moveCamera(CameraUpdateFactory.newLatLng(latLng));
+    }
+
+    public void onConnectionSuspended(int i) {
+        Log.i(TAG, "Location services suspended. Please reconnect.");
+        if (i == CAUSE_SERVICE_DISCONNECTED) {
+            Toast.makeText(this, "Disconnected. Please re-connect.", Toast.LENGTH_SHORT).show();
+        } else if (i == CAUSE_NETWORK_LOST) {
+            Toast.makeText(this, "Network lost. Please re-connect.", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    public void onLocationChanged(Location location) {
+        handleNewLocation(location);
+    }
+
+    public void onConnectionFailed(ConnectionResult connectionResult) {
+            if (connectionResult.hasResolution()) {
+                try {
+                    // Start an Activity that tries to resolve the error
+                    connectionResult.startResolutionForResult(this, CONNECTION_FAILURE_RESOLUTION_REQUEST);
+                } catch (IntentSender.SendIntentException e) {
+                    e.printStackTrace();
+                }
+            } else {
+                Log.i(TAG, "Location services connection failed with code " + connectionResult.getErrorCode());
+            }
+    }
 
     //method that either grants or denies permission requests
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
@@ -96,15 +172,17 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         mMap = googleMap;
 
         //LatLng for a specified location
-        LatLng centennialMall = new LatLng(36.985112, -86.455651);
+       // LatLng centennialMall = new LatLng(36.985112, -86.455651);
 
         //adds a marker on the map with specified LatLng
-        mMap.addMarker(new MarkerOptions().position(centennialMall).title("Centennial Mall - WKU"));
+        //mMap.addMarker(new MarkerOptions().position(centennialMall).title("Centennial Mall - WKU"));
 
         //Moves the camera to a specified LatLng
-        mMap.moveCamera(CameraUpdateFactory.newLatLng(centennialMall));
+        //mMap.moveCamera(CameraUpdateFactory.newLatLng(centennialMall));
 
         //Zooms the camera in a specified amount. (5, 10, 15, 20)
-        mMap.moveCamera(CameraUpdateFactory.zoomTo(15));
+        //mMap.moveCamera(CameraUpdateFactory.zoomTo(15));
     }
+
+
 }
