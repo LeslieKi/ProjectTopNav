@@ -26,16 +26,22 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     private SupportMapFragment mapFragment;
     private GoogleMap mMap;
-    private GoogleApiClient mGoogleApiClient;
     private LocationRequest mLocationRequest;
+
+    // Google Services client for APIs and other functions
+    private GoogleApiClient mGoogleApiClient;
+
+    // TAG variable for printing info to the log
     public static final String TAG = MapsActivity.class.getSimpleName();
 
-    private long UPDATE_INTERVAL = 10 * 1000; /* 10 secs */
-    private long FASTEST_INTERVAL = 2000; /*2 secs*/
+    // app-defined constant for checking permission cases
+    private static final int MY_PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION = 1;
+
+    // Constant static member to define request code to be sent to Google Play Services
     private final static int CONNECTION_FAILURE_RESOLUTION_REQUEST = 9000;
 
-    //app-defined constant for checking permission cases
-    private static final int MY_PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION = 1;
+    private long UPDATE_INTERVAL = 10 * 1000; // 10 seconds, in milliseconds
+    private long FASTEST_INTERVAL = 2000; // 1 second, in milliseconds
 
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -45,49 +51,70 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         mapFragment = (SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
 
-        //Create the location client to start receiving updates
+        // Create the API client to start receiving Google Services
+        // Multiple APIs can be passed in here
         mGoogleApiClient = new GoogleApiClient.Builder(this)
-                .addApi(LocationServices.API)
+                // First two lines signify this class is handling connections
                 .addConnectionCallbacks(this)
                 .addOnConnectionFailedListener(this)
+                // APIs to utilize are added here
+                .addApi(LocationServices.API)
+                // Builds the client
                 .build();
 
+        // Initializes the LocationRequest variable
+        // Set priority to High Accuracy to request as accurate a location as possible
+        // This takes more power and time, but is essential for a navigation app
+        // Obviously use low time intervals since we're creating a navigation app
         mLocationRequest = LocationRequest.create()
                 .setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY)
-                .setInterval(10 * 1000)        // 10 seconds, in milliseconds
-                .setFastestInterval(1 * 1000); // 1 second, in milliseconds
-
-
-
-        //method call to get permission to access device location
-        //checking for ACCESS_FINE_LOCATION
-        //getPermissionToReadUserLocation();
+                .setInterval(UPDATE_INTERVAL)
+                .setFastestInterval(FASTEST_INTERVAL);
     }//end onCreate
 
+    /**
+     * Now that the client is built, we connect it
+     * Use onResume() instead of onStart() because the activity may be paused
+     * At any time, for example when a call or text message comes in
+     * This allows the activity to be resumed at any time
+     * onResume() is called right after onCreate()
+     */
     protected void onResume() {
         super.onResume();
-       // setUpMapIfNeeded();
         mGoogleApiClient.connect();
-    }
+    }// end onResume
 
+    /**
+     * Whenever adding code in onResume(), we add corresponding code for onPause
+     * Disconnect from location services when activity is paused
+     * Verify the client is connected before disconnecting
+     */
     protected void onPause() {
         super.onPause();
         if (mGoogleApiClient.isConnected()) {
             LocationServices.FusedLocationApi.removeLocationUpdates(mGoogleApiClient, this);
             mGoogleApiClient.disconnect();
         }
-    }
+    }// end onPause
 
+    /**
+     * Once client is connected to location services, onConnect() is called
+     * Obtain last location and log it
+     */
     public void onConnected(Bundle bundle) {
+        // TAG to check onConnected is being accessed
         Log.i(TAG, "Location services connected.");
 
-        //Get last known recent location
+        //Check for permission for location data
+        //If permission is not granted, request it
         if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION}, MY_PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION);
         }
 
+        // Location variable for storing last location
+        // Note: this may be null if the last location is not already known
+        // For example, the first time Google Play services checks for location
         Location location = LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient);
-        //Note that this can be null if last location isn't already known
 
         if (location == null) {
             Log.d(TAG, "Location null");
@@ -95,22 +122,32 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         } else {
             handleNewLocation(location);
         }
+    }// end onConnected
 
-    }
-
+    /**
+     * This method will handle all new location requests
+     * Also adds recent location to the map and adjusts camera
+     */
     private void handleNewLocation(Location location) {
+        // Print passed location to the log
         Log.d(TAG, location.toString());
 
+        // Use double for storing coordinates as this is what LatLng objects use
         double currentLatitude = location.getLatitude();
         double currentLongitude = location.getLongitude();
+
+        // Create new LatLng object from recent location
         LatLng latLng = new LatLng(currentLatitude, currentLongitude);
 
+        // Create a new market and display it on the map
+        // MarkerOptions defines the options for the new marker
         MarkerOptions options = new MarkerOptions()
                 .position(latLng)
                 .title("I am here!");
         mMap.addMarker(options);
         mMap.moveCamera(CameraUpdateFactory.newLatLng(latLng));
-    }
+        mMap.moveCamera(CameraUpdateFactory.zoomTo(15));
+    }// end handleNewLocation
 
     public void onConnectionSuspended(int i) {
         Log.i(TAG, "Location services suspended. Please reconnect.");
@@ -119,26 +156,31 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         } else if (i == CAUSE_NETWORK_LOST) {
             Toast.makeText(this, "Network lost. Please re-connect.", Toast.LENGTH_SHORT).show();
         }
-    }
-
-    public void onLocationChanged(Location location) {
-        handleNewLocation(location);
-    }
+    }// end onConnectionSuspended
 
     public void onConnectionFailed(ConnectionResult connectionResult) {
-            if (connectionResult.hasResolution()) {
-                try {
-                    // Start an Activity that tries to resolve the error
-                    connectionResult.startResolutionForResult(this, CONNECTION_FAILURE_RESOLUTION_REQUEST);
-                } catch (IntentSender.SendIntentException e) {
-                    e.printStackTrace();
-                }
-            } else {
-                Log.i(TAG, "Location services connection failed with code " + connectionResult.getErrorCode());
+        if (connectionResult.hasResolution()) {
+            try {
+                // Start an Activity that tries to resolve the error
+                connectionResult.startResolutionForResult(this, CONNECTION_FAILURE_RESOLUTION_REQUEST);
+            } catch (IntentSender.SendIntentException e) {
+                e.printStackTrace();
             }
-    }
+        } else {
+            Log.i(TAG, "Location services connection failed with code " + connectionResult.getErrorCode());
+        }
+    }// end onConnectionFailed
 
-    //method that either grants or denies permission requests
+    /**
+     * This method is called any time a new location is detected by Google Play Services
+     */
+    public void onLocationChanged(Location location) {
+        handleNewLocation(location);
+    }// end handleNewLocation
+
+    /**
+     * method that either grants or denies permission requests
+     */
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
 
         switch (requestCode) {
@@ -152,7 +194,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                     // Permission denied, disable functionality
                     Toast.makeText(this, "Access Location permission denied", Toast.LENGTH_SHORT).show();
                 }
-                return;
             }
             // Other case lines to check for other permissions go here
         }
@@ -161,8 +202,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     /**
      * Manipulates the map once available.
      * This callback is triggered when the map is ready to be used.
-     * This is where we can add markers or lines, add listeners or move the camera. In this case,
-     * we just add a marker at Centennial Mall.
+     * This is where we can add markers or lines, add listeners or move the camera.
      * If Google Play services is not installed on the device, the user will be prompted to install
      * it inside the SupportMapFragment. This method will only be triggered once the user has
      * installed Google Play services and returned to the app.
@@ -170,19 +210,5 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     public void onMapReady(GoogleMap googleMap) {
         //initialize map object
         mMap = googleMap;
-
-        //LatLng for a specified location
-       // LatLng centennialMall = new LatLng(36.985112, -86.455651);
-
-        //adds a marker on the map with specified LatLng
-        //mMap.addMarker(new MarkerOptions().position(centennialMall).title("Centennial Mall - WKU"));
-
-        //Moves the camera to a specified LatLng
-        //mMap.moveCamera(CameraUpdateFactory.newLatLng(centennialMall));
-
-        //Zooms the camera in a specified amount. (5, 10, 15, 20)
-        //mMap.moveCamera(CameraUpdateFactory.zoomTo(15));
-    }
-
-
-}
+    }// end onMapReady
+} // end class MapsActivity
