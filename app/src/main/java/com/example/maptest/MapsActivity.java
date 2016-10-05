@@ -159,7 +159,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         // Create new LatLng object from recent location
         LatLng latLng = new LatLng(currentLatitude, currentLongitude);
 
-        // Create a new market and display it on the map
+        // Create a new marker and display it on the map
         // MarkerOptions defines the options for the new marker
         MarkerOptions options = new MarkerOptions()
                 .position(latLng)
