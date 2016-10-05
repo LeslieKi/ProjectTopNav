@@ -6,7 +6,6 @@ import android.location.Location;
 import android.os.Bundle;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentActivity;
-import android.support.v4.content.ContextCompat;
 import android.util.Log;
 import android.widget.Toast;
 
@@ -35,7 +34,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     public static final String TAG = MapsActivity.class.getSimpleName();
 
     // app-defined constant for checking permission cases
-    private static final int MY_PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION = 1;
+    private static final int LOCATION_PERMISSION_REQUEST_CODE = 1;
 
     // Constant static member to define request code to be sent to Google Play Services
     private final static int CONNECTION_FAILURE_RESOLUTION_REQUEST = 9000;
@@ -107,8 +106,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
         //Check for permission for location data
         //If permission is not granted, request it
-        if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION}, MY_PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION);
+        if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            return;
         }
 
         // Location variable for storing last location
@@ -120,34 +119,9 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             Log.d(TAG, "Location null");
             LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleApiClient, mLocationRequest, this);
         } else {
-            handleNewLocation(location);
+            onLocationChanged(location);
         }
     }// end onConnected
-
-    /**
-     * This method will handle all new location requests
-     * Also adds recent location to the map and adjusts camera
-     */
-    private void handleNewLocation(Location location) {
-        // Print passed location to the log
-        Log.d(TAG, location.toString());
-
-        // Use double for storing coordinates as this is what LatLng objects use
-        double currentLatitude = location.getLatitude();
-        double currentLongitude = location.getLongitude();
-
-        // Create new LatLng object from recent location
-        LatLng latLng = new LatLng(currentLatitude, currentLongitude);
-
-        // Create a new market and display it on the map
-        // MarkerOptions defines the options for the new marker
-        MarkerOptions options = new MarkerOptions()
-                .position(latLng)
-                .title("I am here!");
-        mMap.addMarker(options);
-        mMap.moveCamera(CameraUpdateFactory.newLatLng(latLng));
-        mMap.moveCamera(CameraUpdateFactory.zoomTo(15));
-    }// end handleNewLocation
 
     public void onConnectionSuspended(int i) {
         Log.i(TAG, "Location services suspended. Please reconnect.");
@@ -175,29 +149,25 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
      * This method is called any time a new location is detected by Google Play Services
      */
     public void onLocationChanged(Location location) {
-        handleNewLocation(location);
-    }// end handleNewLocation
+        // Print passed location to the log
+        Log.d(TAG, location.toString());
 
-    /**
-     * method that either grants or denies permission requests
-     */
-    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        // Use double for storing coordinates as this is what LatLng objects use
+        double currentLatitude = location.getLatitude();
+        double currentLongitude = location.getLongitude();
 
-        switch (requestCode) {
-            case MY_PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION: {
-                // If request is cancelled, the result arrays are empty
-                if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    Toast.makeText(this, "Access Location permission granted", Toast.LENGTH_SHORT).show();
-                    // Permission was granted
-                    // Do stuff that requires the permission
-                } else {
-                    // Permission denied, disable functionality
-                    Toast.makeText(this, "Access Location permission denied", Toast.LENGTH_SHORT).show();
-                }
-            }
-            // Other case lines to check for other permissions go here
-        }
-    }//end onRequestPermissionsResult
+        // Create new LatLng object from recent location
+        LatLng latLng = new LatLng(currentLatitude, currentLongitude);
+
+        // Create a new market and display it on the map
+        // MarkerOptions defines the options for the new marker
+        MarkerOptions options = new MarkerOptions()
+                .position(latLng)
+                .title("I am here!");
+        mMap.addMarker(options);
+        //mMap.moveCamera(CameraUpdateFactory.newLatLng(latLng));
+        //mMap.moveCamera(CameraUpdateFactory.zoomTo(20));
+    }// end onLocationChanged
 
     /**
      * Manipulates the map once available.
@@ -208,7 +178,41 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
      * installed Google Play services and returned to the app.
      */
     public void onMapReady(GoogleMap googleMap) {
-        //initialize map object
+        //Check for permission for location data
+        //If permission is not granted, request it
+
         mMap = googleMap;
+        mMap.setMinZoomPreference(15.0f);
+        mMap.setMaxZoomPreference(20.0f);
+
+        //Test JSON for styling the map
+        /*MapStyleOptions style = new MapStyleOptions("[" +
+                " {" +
+                " \"featureType\":\"poi.school\"," +
+                " \"elementType\": \"geometry\"," +
+                " \"stylers\":[" +
+                "    {" +
+                "    \"color\": \"#ff3c3c\"" +
+                "    }," +
+                "    {" +
+                "     \"saturation\": \"100\"" +
+                "    }," +
+                "    {" +
+                "        \"lightness\": \"45\"" +
+                "     }" +
+                "    ]" +
+                " }" +
+                "]");*/
+
+        // How the blue myLocation dot is enabled
+        //if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+        //    return;
+        // }
+        //mMap.setMyLocationEnabled(true);
+
+        LatLng WKU = new LatLng(36.985111, -86.455669);
+        mMap.moveCamera(CameraUpdateFactory.newLatLng(WKU));
+        mMap.moveCamera(CameraUpdateFactory.zoomTo(15));
+
     }// end onMapReady
 } // end class MapsActivity
