@@ -19,7 +19,6 @@ import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.LatLng;
-import com.google.android.gms.maps.model.MarkerOptions;
 
 public class MapsActivity extends FragmentActivity implements OnMapReadyCallback, GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, LocationListener {
 
@@ -159,14 +158,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         // Create new LatLng object from recent location
         LatLng latLng = new LatLng(currentLatitude, currentLongitude);
 
-        // Create a new market and display it on the map
-        // MarkerOptions defines the options for the new marker
-        MarkerOptions options = new MarkerOptions()
-                .position(latLng)
-                .title("I am here!");
-        mMap.addMarker(options);
-        //mMap.moveCamera(CameraUpdateFactory.newLatLng(latLng));
-        //mMap.moveCamera(CameraUpdateFactory.zoomTo(20));
+        mMap.moveCamera(CameraUpdateFactory.newLatLng(latLng));
+        mMap.moveCamera(CameraUpdateFactory.zoomTo(15));
     }// end onLocationChanged
 
     /**
@@ -180,39 +173,15 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     public void onMapReady(GoogleMap googleMap) {
         //Check for permission for location data
         //If permission is not granted, request it
+        if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            return;
+        }
 
         mMap = googleMap;
         mMap.setMinZoomPreference(15.0f);
         mMap.setMaxZoomPreference(20.0f);
 
-        //Test JSON for styling the map
-        /*MapStyleOptions style = new MapStyleOptions("[" +
-                " {" +
-                " \"featureType\":\"poi.school\"," +
-                " \"elementType\": \"geometry\"," +
-                " \"stylers\":[" +
-                "    {" +
-                "    \"color\": \"#ff3c3c\"" +
-                "    }," +
-                "    {" +
-                "     \"saturation\": \"100\"" +
-                "    }," +
-                "    {" +
-                "        \"lightness\": \"45\"" +
-                "     }" +
-                "    ]" +
-                " }" +
-                "]");*/
-
         // How the blue myLocation dot is enabled
-        //if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-        //    return;
-        // }
-        //mMap.setMyLocationEnabled(true);
-
-        LatLng WKU = new LatLng(36.985111, -86.455669);
-        mMap.moveCamera(CameraUpdateFactory.newLatLng(WKU));
-        mMap.moveCamera(CameraUpdateFactory.zoomTo(15));
-
+        mMap.setMyLocationEnabled(true);
     }// end onMapReady
 } // end class MapsActivity
