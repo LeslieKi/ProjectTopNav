@@ -1,4 +1,12 @@
 <resources>
     <string name="app_name">MapTest</string>
     <string name="title_activity_maps">Map</string>
+    <string name="title_activity_main_screen">MainScreen</string>
+    <string name="button_send">View Map</string>
+    <string name="button_search">Search</string>
+
+    <!-- Permissions -->
+    <string name="permission_rationale_location">Access to location services is required to determine location and navigation.</string>
+    <string name="location_permission_denied">This app requires location permission to enable location services. Please try again and grant access to use location data.\nIf the permission has been permanently denied, it can be enabled from the System Settings > Apps > MapTest.</string>
+    <string name="permission_required_toast">Location permission is required to use this app.</string>
 </resources>
