@@ -1,0 +1,18 @@
+[
+    {
+        "merged": "C:\\Users\\LKing\\Desktop\\GoogleMapDirectionSimple-master\\app\\build\\intermediates\\res\\merged\\debug\\drawable-xxxhdpi\\places_ic_search.png",
+        "source": "C:\\Users\\LKing\\Desktop\\GoogleMapDirectionSimple-master\\app\\build\\intermediates\\exploded-aar\\com.google.android.gms\\play-services-location\\8.4.0\\res\\drawable-xxxhdpi\\places_ic_search.png"
+    },
+    {
+        "merged": "C:\\Users\\LKing\\Desktop\\GoogleMapDirectionSimple-master\\app\\build\\intermediates\\res\\merged\\debug\\drawable-xxxhdpi\\powered_by_google_dark.png",
+        "source": "C:\\Users\\LKing\\Desktop\\GoogleMapDirectionSimple-master\\app\\build\\intermediates\\exploded-aar\\com.google.android.gms\\play-services-location\\8.4.0\\res\\drawable-xxxhdpi\\powered_by_google_dark.png"
+    },
+    {
+        "merged": "C:\\Users\\LKing\\Desktop\\GoogleMapDirectionSimple-master\\app\\build\\intermediates\\res\\merged\\debug\\drawable-xxxhdpi\\powered_by_google_light.png",
+        "source": "C:\\Users\\LKing\\Desktop\\GoogleMapDirectionSimple-master\\app\\build\\intermediates\\exploded-aar\\com.google.android.gms\\play-services-location\\8.4.0\\res\\drawable-xxxhdpi\\powered_by_google_light.png"
+    },
+    {
+        "merged": "C:\\Users\\LKing\\Desktop\\GoogleMapDirectionSimple-master\\app\\build\\intermediates\\res\\merged\\debug\\drawable-xxxhdpi\\places_ic_clear.png",
+        "source": "C:\\Users\\LKing\\Desktop\\GoogleMapDirectionSimple-master\\app\\build\\intermediates\\exploded-aar\\com.google.android.gms\\play-services-location\\8.4.0\\res\\drawable-xxxhdpi\\places_ic_clear.png"
+    }
+]
