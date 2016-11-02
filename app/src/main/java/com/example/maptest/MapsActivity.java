@@ -1,187 +1,367 @@
 package com.example.maptest;
 
-import android.content.IntentSender;
+import android.Manifest;
+import android.app.PendingIntent;
+import android.content.Context;
+import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
 import android.location.Location;
 import android.os.Bundle;
+import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentActivity;
+import android.support.v4.content.ContextCompat;
 import android.util.Log;
-import android.widget.Toast;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.common.api.ResultCallback;
+import com.google.android.gms.common.api.Status;
+import com.google.android.gms.location.Geofence;
+import com.google.android.gms.location.GeofencingRequest;
 import com.google.android.gms.location.LocationListener;
 import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationServices;
-import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
+import com.google.android.gms.maps.model.BitmapDescriptorFactory;
+import com.google.android.gms.maps.model.Circle;
+import com.google.android.gms.maps.model.CircleOptions;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.Marker;
+import com.google.android.gms.maps.model.MarkerOptions;
 
-public class MapsActivity extends FragmentActivity implements OnMapReadyCallback, GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, LocationListener {
+public class MapsActivity extends FragmentActivity implements
+        OnMapReadyCallback,
+        GoogleApiClient.ConnectionCallbacks,
+        GoogleApiClient.OnConnectionFailedListener,
+        ResultCallback<Status>,
+        LocationListener {
+
+    private GoogleMap map;
+    private GoogleApiClient googleApiClient;
+    private Location lastLocation;
+    private LocationRequest locationRequest;
 
     private SupportMapFragment mapFragment;
-    private GoogleMap mMap;
-    private LocationRequest mLocationRequest;
 
-    // Google Services client for APIs and other functions
-    private GoogleApiClient mGoogleApiClient;
+    private LatLng cherryHall = new LatLng(36.987336, -86.451221);
 
-    // TAG variable for printing info to the log
     public static final String TAG = MapsActivity.class.getSimpleName();
 
-    // app-defined constant for checking permission cases
-    private static final int LOCATION_PERMISSION_REQUEST_CODE = 1;
+    private final int REQ_PERMISSION = 999;
 
-    // Constant static member to define request code to be sent to Google Play Services
     private final static int CONNECTION_FAILURE_RESOLUTION_REQUEST = 9000;
 
     private long UPDATE_INTERVAL = 10 * 1000; // 10 seconds, in milliseconds
     private long FASTEST_INTERVAL = 2000; // 1 second, in milliseconds
 
+    private static final String NOTIFICATION_MSG = "NOTIFICATION MSG";
+
+    public static Intent makeNotificationIntent(Context context, String msg) {
+        Log.d(TAG, "makeNotificationIntent()");
+        Intent intent = new Intent(context, MapsActivity.class);
+        intent.putExtra(NOTIFICATION_MSG, msg);
+        return intent;
+    }
+
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_maps);
 
-        // Obtain the SupportMapFragment and get notified when the map is ready to be used.
+        // initialize GoogleMaps
+        initGMaps();
+
+        // create GoogleApiClient
+        createGoogleApi();
+
+        markerForGeofence(cherryHall);
+        startGeofence();
+    }
+
+    // Create GoogleApiClient instance
+    private void createGoogleApi() {
+        Log.d(TAG, "createGoogleApi()");
+        if (googleApiClient == null) {
+            googleApiClient = new GoogleApiClient.Builder(this)
+                    .addConnectionCallbacks(this)
+                    .addOnConnectionFailedListener(this)
+                    .addApi(LocationServices.API)
+                    .build();
+        }
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+
+        // Call GoogleApiClient connection when starting the Activity
+        googleApiClient.connect();
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+
+        // Disconnect GoogleApiClient when stopping Activity
+        googleApiClient.disconnect();
+    }
+
+    // Check for permission to access Location
+    private boolean checkPermission() {
+        Log.d(TAG, "checkPermission()");
+        // Ask for permission if it wasn't granted yet
+        return (ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION)
+                == PackageManager.PERMISSION_GRANTED);
+    }
+
+    // Asks for permission
+    private void askPermission() {
+        Log.d(TAG, "askPermission()");
+        ActivityCompat.requestPermissions(
+                this,
+                new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
+                REQ_PERMISSION
+        );
+    }
+
+    // Verify user's response of the permission requested
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        Log.d(TAG, "onRequestPermissionsResult()");
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        switch (requestCode) {
+            case REQ_PERMISSION: {
+                if (grantResults.length > 0
+                        && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    // Permission granted
+                    getLastKnownLocation();
+
+                } else {
+                    // Permission denied
+                    permissionsDenied();
+                }
+                break;
+            }
+        }
+    }
+
+    // App cannot work without the permissions
+    private void permissionsDenied() {
+        Log.w(TAG, "permissionsDenied()");
+        // TODO close app and warn user
+    }
+
+    // Initialize GoogleMaps
+    private void initGMaps() {
         mapFragment = (SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
+    }
 
-        // Create the API client to start receiving Google Services
-        // Multiple APIs can be passed in here
-        mGoogleApiClient = new GoogleApiClient.Builder(this)
-                // First two lines signify this class is handling connections
-                .addConnectionCallbacks(this)
-                .addOnConnectionFailedListener(this)
-                // APIs to utilize are added here
-                .addApi(LocationServices.API)
-                // Builds the client
-                .build();
+    // Callback called when Map is ready
+    @Override
+    public void onMapReady(GoogleMap googleMap) {
+        Log.d(TAG, "onMapReady()");
+        map = googleMap;
 
-        // Initializes the LocationRequest variable
-        // Set priority to High Accuracy to request as accurate a location as possible
-        // This takes more power and time, but is essential for a navigation app
-        // Obviously use low time intervals since we're creating a navigation app
-        mLocationRequest = LocationRequest.create()
+        CircleOptions circleOptions = new CircleOptions()
+                .center(cherryHall)
+                .strokeColor(Color.argb(50, 70, 70, 70))
+                .fillColor(Color.argb(100, 150, 150, 150))
+                .radius(50.0f);
+        geoFenceLimits = map.addCircle(circleOptions);
+    }
+
+    // Start location Updates
+    private void startLocationUpdates() {
+        Log.i(TAG, "startLocationUpdates()");
+        locationRequest = LocationRequest.create()
                 .setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY)
                 .setInterval(UPDATE_INTERVAL)
                 .setFastestInterval(FASTEST_INTERVAL);
-    }//end onCreate
 
-    /**
-     * Now that the client is built, we connect it
-     * Use onResume() instead of onStart() because the activity may be paused
-     * At any time, for example when a call or text message comes in
-     * This allows the activity to be resumed at any time
-     * onResume() is called right after onCreate()
-     */
-    protected void onResume() {
-        super.onResume();
-        mGoogleApiClient.connect();
-    }// end onResume
+        if (checkPermission())
+            LocationServices.FusedLocationApi.requestLocationUpdates(googleApiClient, locationRequest, this);
+    }
 
-    /**
-     * Whenever adding code in onResume(), we add corresponding code for onPause
-     * Disconnect from location services when activity is paused
-     * Verify the client is connected before disconnecting
-     */
-    protected void onPause() {
-        super.onPause();
-        if (mGoogleApiClient.isConnected()) {
-            LocationServices.FusedLocationApi.removeLocationUpdates(mGoogleApiClient, this);
-            mGoogleApiClient.disconnect();
-        }
-    }// end onPause
-
-    /**
-     * Once client is connected to location services, onConnect() is called
-     * Obtain last location and log it
-     */
-    public void onConnected(Bundle bundle) {
-        // TAG to check onConnected is being accessed
-        Log.i(TAG, "Location services connected.");
-
-        //Check for permission for location data
-        //If permission is not granted, request it
-        if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            return;
-        }
-
-        // Location variable for storing last location
-        // Note: this may be null if the last location is not already known
-        // For example, the first time Google Play services checks for location
-        Location location = LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient);
-
-        if (location == null) {
-            Log.d(TAG, "Location null");
-            LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleApiClient, mLocationRequest, this);
-        } else {
-            onLocationChanged(location);
-        }
-    }// end onConnected
-
-    public void onConnectionSuspended(int i) {
-        Log.i(TAG, "Location services suspended. Please reconnect.");
-        if (i == CAUSE_SERVICE_DISCONNECTED) {
-            Toast.makeText(this, "Disconnected. Please re-connect.", Toast.LENGTH_SHORT).show();
-        } else if (i == CAUSE_NETWORK_LOST) {
-            Toast.makeText(this, "Network lost. Please re-connect.", Toast.LENGTH_SHORT).show();
-        }
-    }// end onConnectionSuspended
-
-    public void onConnectionFailed(ConnectionResult connectionResult) {
-        if (connectionResult.hasResolution()) {
-            try {
-                // Start an Activity that tries to resolve the error
-                connectionResult.startResolutionForResult(this, CONNECTION_FAILURE_RESOLUTION_REQUEST);
-            } catch (IntentSender.SendIntentException e) {
-                e.printStackTrace();
-            }
-        } else {
-            Log.i(TAG, "Location services connection failed with code " + connectionResult.getErrorCode());
-        }
-    }// end onConnectionFailed
-
-    /**
-     * This method is called any time a new location is detected by Google Play Services
-     */
+    @Override
     public void onLocationChanged(Location location) {
-        // Print passed location to the log
-        Log.d(TAG, location.toString());
+        Log.d(TAG, "onLocationChanged [" + location + "]");
+        lastLocation = location;
+        writeActualLocation(location);
+    }
 
-        // Use double for storing coordinates as this is what LatLng objects use
-        double currentLatitude = location.getLatitude();
-        double currentLongitude = location.getLongitude();
+    // GoogleApiClient.ConnectionCallbacks connected
+    @Override
+    public void onConnected(@Nullable Bundle bundle) {
+        Log.i(TAG, "onConnected()");
+        getLastKnownLocation();
+    }
 
-        // Create new LatLng object from recent location
-        LatLng latLng = new LatLng(currentLatitude, currentLongitude);
+    // GoogleApiClient.ConnectionCallbacks suspended
+    @Override
+    public void onConnectionSuspended(int i) {
+        Log.w(TAG, "onConnectionSuspended()");
+    }
 
-        mMap.moveCamera(CameraUpdateFactory.newLatLng(latLng));
-        mMap.moveCamera(CameraUpdateFactory.zoomTo(15));
-    }// end onLocationChanged
+    // GoogleApiClient.OnConnectionFailedListener fail
+    @Override
+    public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
+        Log.w(TAG, "onConnectionFailed()");
+    }
 
-    /**
-     * Manipulates the map once available.
-     * This callback is triggered when the map is ready to be used.
-     * This is where we can add markers or lines, add listeners or move the camera.
-     * If Google Play services is not installed on the device, the user will be prompted to install
-     * it inside the SupportMapFragment. This method will only be triggered once the user has
-     * installed Google Play services and returned to the app.
-     */
-    public void onMapReady(GoogleMap googleMap) {
-        //Check for permission for location data
-        //If permission is not granted, request it
-        if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            return;
+    // Get last known location
+    private void getLastKnownLocation() {
+        Log.d(TAG, "getLastKnownLocation()");
+        if (checkPermission()) {
+            lastLocation = LocationServices.FusedLocationApi.getLastLocation(googleApiClient);
+            if (lastLocation != null) {
+                Log.i(TAG, "LasKnown location. " +
+                        "Long: " + lastLocation.getLongitude() +
+                        " | Lat: " + lastLocation.getLatitude());
+                writeLastLocation();
+                startLocationUpdates();
+            } else {
+                Log.w(TAG, "No location retrieved yet");
+                startLocationUpdates();
+            }
+        } else askPermission();
+    }
+
+    private void writeActualLocation(Location location) {
+        markerLocation(new LatLng(location.getLatitude(), location.getLongitude()));
+    }
+
+    private void writeLastLocation() {
+        writeActualLocation(lastLocation);
+    }
+
+    private Marker locationMarker;
+
+    private void markerLocation(LatLng latLng) {
+        Log.i(TAG, "markerLocation(" + latLng + ")");
+        String title = latLng.latitude + ", " + latLng.longitude;
+        MarkerOptions markerOptions = new MarkerOptions()
+                .position(latLng)
+                .title(title);
+        if (map != null) {
+            if (locationMarker != null)
+                locationMarker.remove();
+            locationMarker = map.addMarker(markerOptions);
+            //float zoom = 14f;
+            //CameraUpdate cameraUpdate = CameraUpdateFactory.newLatLngZoom(latLng, zoom);
+            //map.animateCamera(cameraUpdate);
         }
+    }
 
-        mMap = googleMap;
-        mMap.setMinZoomPreference(15.0f);
-        mMap.setMaxZoomPreference(20.0f);
+    private Marker geoFenceMarker;
 
-        // How the blue myLocation dot is enabled
-        mMap.setMyLocationEnabled(true);
-    }// end onMapReady
+    private void markerForGeofence(LatLng latLng) {
+        Log.i(TAG, "markerForGeofence(" + latLng + ")");
+        String title = latLng.latitude + ", " + latLng.longitude;
+        // Define marker options
+        MarkerOptions markerOptions = new MarkerOptions()
+                .position(cherryHall)
+                .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_ORANGE))
+                .title(title);
+        if (map != null) {
+            // Remove last geoFenceMarker
+            if (geoFenceMarker != null)
+                geoFenceMarker.remove();
+
+            geoFenceMarker = map.addMarker(markerOptions);
+
+        }
+    }
+
+    // Start Geofence creation process
+    private void startGeofence() {
+        Log.i(TAG, "startGeofence()");
+        if (geoFenceMarker != null) {
+            Geofence geofence = createGeofence(geoFenceMarker.getPosition(), GEOFENCE_RADIUS);
+            GeofencingRequest geofenceRequest = createGeofenceRequest(geofence);
+            addGeofence(geofenceRequest);
+        } else {
+            Log.e(TAG, "Geofence marker is null");
+        }
+    }
+
+    private static final long GEO_DURATION = 60 * 60 * 1000;
+    private static final String GEOFENCE_REQ_ID = "My Geofence";
+    private static final float GEOFENCE_RADIUS = 500.0f; // in meters
+
+    // Create a Geofence
+    private Geofence createGeofence(LatLng latLng, float radius) {
+        Log.d(TAG, "createGeofence");
+        return new Geofence.Builder()
+                .setRequestId(GEOFENCE_REQ_ID)
+                .setCircularRegion(latLng.latitude, latLng.longitude, radius)
+                .setExpirationDuration(GEO_DURATION)
+                .setTransitionTypes(Geofence.GEOFENCE_TRANSITION_ENTER
+                        | Geofence.GEOFENCE_TRANSITION_EXIT)
+                .build();
+    }
+
+    // Create a Geofence Request
+    private GeofencingRequest createGeofenceRequest(Geofence geofence) {
+        Log.d(TAG, "createGeofenceRequest");
+        return new GeofencingRequest.Builder()
+                .setInitialTrigger(GeofencingRequest.INITIAL_TRIGGER_ENTER)
+                .addGeofence(geofence)
+                .build();
+    }
+
+    private PendingIntent geoFencePendingIntent;
+    private final int GEOFENCE_REQ_CODE = 0;
+
+    private PendingIntent createGeofencePendingIntent() {
+        Log.d(TAG, "createGeofencePendingIntent");
+        if (geoFencePendingIntent != null)
+            return geoFencePendingIntent;
+
+        Intent intent = new Intent(this, GeofenceTransitionService.class);
+        return PendingIntent.getService(
+                this, GEOFENCE_REQ_CODE, intent, PendingIntent.FLAG_UPDATE_CURRENT);
+    }
+
+    // Add the created GeofenceRequest to the device's monitoring list
+    private void addGeofence(GeofencingRequest request) {
+        Log.d(TAG, "addGeofence");
+        if (checkPermission())
+            LocationServices.GeofencingApi.addGeofences(
+                    googleApiClient,
+                    request,
+                    createGeofencePendingIntent()
+            ).setResultCallback(this);
+    }
+
+    @Override
+    public void onResult(@NonNull Status status) {
+        Log.i(TAG, "onResult: " + status);
+        if (status.isSuccess()) {
+            drawGeofence();
+        } else {
+            // inform about fail
+        }
+    }
+
+    // Draw Geofence circle on GoogleMap
+    private Circle geoFenceLimits;
+
+    private void drawGeofence() {
+        Log.d(TAG, "drawGeofence()");
+
+        if (geoFenceLimits != null)
+            geoFenceLimits.remove();
+
+        CircleOptions circleOptions = new CircleOptions()
+                .center(geoFenceMarker.getPosition())
+                .strokeColor(Color.argb(50, 70, 70, 70))
+                .fillColor(Color.argb(100, 150, 150, 150))
+                .radius(GEOFENCE_RADIUS);
+        geoFenceLimits = map.addCircle(circleOptions);
+    }
 } // end class MapsActivity
