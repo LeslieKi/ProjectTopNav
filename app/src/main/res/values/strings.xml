@@ -9,4 +9,25 @@
     <string name="permission_rationale_location">Access to location services is required to determine location and navigation.</string>
     <string name="location_permission_denied">This app requires location permission to enable location services. Please try again and grant access to use location data.\nIf the permission has been permanently denied, it can be enabled from the System Settings > Apps > MapTest.</string>
     <string name="permission_required_toast">Location permission is required to use this app.</string>
+
+    <!-- Error strings -->
+    <string name="not_connected">GoogleApiClient no yet connected. Try again.</string>
+    <string name="geofence_not_available">Geofence service is not available now</string>
+    <string name="geofence_too_many_geofences">Your app has registered too many geofences</string>
+    <string name="geofence_too_many_pending_intents">
+        You have provided too many PendingIntents to the addGeofences() call
+    </string>
+    <string name="unknown_geofence_error">
+        Unknown error: the Geofence service is not available now
+    </string>
+    <string name="geofence_transition_invalid_type">
+        Geofence transition error: invalid transition type %1$d
+    </string>
+
+    <!-- Transition type strings -->
+    <string name="geofence_transition_entered">Entered</string>
+    <string name="geofence_transition_exited">Exited</string>
+    <string name="unknown_geofence_transition">Unknown Transition</string>
+
+    <string name="geofence_transition_notification_text">Click notification to return to app</string>
 </resources>

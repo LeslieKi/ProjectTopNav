@@ -4,6 +4,7 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentSender;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.location.Location;
@@ -32,6 +33,8 @@ import com.google.android.gms.maps.model.CircleOptions;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MarkerOptions;
 
+import java.util.ArrayList;
+
 import static com.example.maptest.R.id.map;
 
 public class MapsActivity extends FragmentActivity implements
@@ -41,8 +44,16 @@ public class MapsActivity extends FragmentActivity implements
         LocationListener,
         ResultCallback<Status> {
 
+    long start;
+    long end;
+
     private SupportMapFragment mapFragment;
     private GoogleMap mMap;
+
+    protected ArrayList<Geofence> mGeofenceList;
+    private boolean mGeofencesAdded;
+    private PendingIntent mGeofencePendingIntent;
+    private SharedPreferences mSharedPreferences;
 
     // used to build location request client
     private LocationRequest mLocationRequest;
@@ -53,29 +64,23 @@ public class MapsActivity extends FragmentActivity implements
     // TAG variable for printing info to the log
     public static final String TAG = MapsActivity.class.getSimpleName();
 
-    // app-defined constant for checking permission cases
-    private static final int LOCATION_PERMISSION_REQUEST_CODE = 1;
-    private boolean mPermissionDenied = false;
-
     // Constant static member to define request code to be sent to Google Play Services
     private final static int CONNECTION_FAILURE_RESOLUTION_REQUEST = 9000;
 
     private long UPDATE_INTERVAL = 10 * 1000; // 10 seconds, in milliseconds
     private long FASTEST_INTERVAL = 2000; // 1 second, in milliseconds
 
-    private LatLng cherryHall = new LatLng(36.987336, -86.451221);
-
-    public static Intent makeNotificationIntent(Context context, String msg) {
-        Log.d(TAG, "makeNotificationIntent()");
-        Intent intent = new Intent(context, MapsActivity.class);
-        intent.putExtra("Notification message", msg);
-        return intent;
-    }
+    //private LatLng cherryHall = new LatLng(36.987336, -86.451221);
+    private LatLng cherryHall = new LatLng(36.988284, -86.459741);
 
     protected void onCreate(Bundle savedInstanceState) {
         Log.i(TAG, "onCreate.");
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_maps);
+
+        mGeofenceList = new ArrayList<Geofence>();
+        mGeofencePendingIntent = null;
+
 
         // Obtain the SupportMapFragment and get notified when the map is ready to be used.
         mapFragment = (SupportMapFragment) getSupportFragmentManager().findFragmentById(map);
@@ -190,8 +195,10 @@ public class MapsActivity extends FragmentActivity implements
     }// end onConnectionFailed
 
     /**
-     * This method is called any time a new location is detected by Google Play Services
+     * All of the following code is for gathering the user's location
      */
+
+    //This method is called any time Google Play Service's detects a change in location
     public void onLocationChanged(Location location) {
         Log.i(TAG, "onLocationChanged.");
         // Print passed location to the log
@@ -206,8 +213,6 @@ public class MapsActivity extends FragmentActivity implements
 
         mMap.moveCamera(CameraUpdateFactory.newLatLng(latLng));
         mMap.moveCamera(CameraUpdateFactory.zoomTo(15));
-
-        //startGeofence();
     }// end onLocationChanged
 
     /**
@@ -225,6 +230,7 @@ public class MapsActivity extends FragmentActivity implements
         checkPermission();
 
         mMap = googleMap;
+
         mMap.setMinZoomPreference(15.0f);
         mMap.setMaxZoomPreference(20.0f);
 
@@ -234,16 +240,19 @@ public class MapsActivity extends FragmentActivity implements
         //startGeofence();
     }// end onMapReady
 
-    private static final long GEO_DURATION = 60 * 60 * 1000;
+    /**
+     * All of the following code is for building and handling Geofences
+     */
+    private static final long GEO_DURATION = 100 * 1000;
     private static final String GEOFENCE_REQ_ID = "My Geofence";
     private static final float GEOFENCE_RADIUS = 50.0f; // in meters
-    private PendingIntent geoFencePendingIntent;
-    private final int GEOFENCE_REQ_CODE = 0;
+
     private Circle geoFenceLimits;
 
     // Start Geofence creation process
     private void startGeofence() {
         Log.i(TAG, "startGeofence()");
+        start = System.nanoTime();
         Geofence geofence = createGeofence(cherryHall, GEOFENCE_RADIUS);
         GeofencingRequest geofenceRequest = createGeofenceRequest(geofence);
         addGeofence(geofenceRequest);
@@ -256,8 +265,9 @@ public class MapsActivity extends FragmentActivity implements
                 .setRequestId(GEOFENCE_REQ_ID)
                 .setCircularRegion(latLng.latitude, latLng.longitude, radius)
                 .setExpirationDuration(GEO_DURATION)
-                .setTransitionTypes(Geofence.GEOFENCE_TRANSITION_ENTER
+                .setTransitionTypes(Geofence.GEOFENCE_TRANSITION_DWELL
                         | Geofence.GEOFENCE_TRANSITION_EXIT)
+                .setLoiteringDelay(2000)
                 .build();
     }
 
@@ -265,19 +275,23 @@ public class MapsActivity extends FragmentActivity implements
     private GeofencingRequest createGeofenceRequest(Geofence geofence) {
         Log.d(TAG, "createGeofenceRequest");
         return new GeofencingRequest.Builder()
-                .setInitialTrigger(GeofencingRequest.INITIAL_TRIGGER_ENTER)
+                .setInitialTrigger(GeofencingRequest.INITIAL_TRIGGER_DWELL)
                 .addGeofence(geofence)
                 .build();
     }
 
+    private final int GEOFENCE_REQ_CODE = 0;
+
     private PendingIntent createGeofencePendingIntent() {
         Log.d(TAG, "createGeofencePendingIntent");
-        if (geoFencePendingIntent != null)
-            return geoFencePendingIntent;
-
-        Intent intent = new Intent(this, GeofenceTransitionService.class);
-        return PendingIntent.getService(
-                this, GEOFENCE_REQ_CODE, intent, PendingIntent.FLAG_UPDATE_CURRENT);
+        if (mGeofencePendingIntent != null) {
+            Log.d(TAG, "Using existing geofence intent");
+            return mGeofencePendingIntent;
+        } else { Log.d(TAG, "geofence intent is null, creating new intent");
+            Intent intent = new Intent(this, GeofenceTransitionService.class);
+            return PendingIntent.getService(
+                    this, GEOFENCE_REQ_CODE, intent, PendingIntent.FLAG_UPDATE_CURRENT);
+        }
     }
 
     // Add the created GeofenceRequest to the device's monitoring list
@@ -295,10 +309,26 @@ public class MapsActivity extends FragmentActivity implements
         Log.i(TAG, "onResult: " + status);
         if (status.isSuccess()) {
             Log.d(TAG, "Geofence was created");
+            end = System.nanoTime();
+            Log.i(TAG, "Time to start Location Services = "+(end-start)/1000000+ "ms");
+            saveGeofence();
             drawGeofence();
         } else {
             Log.d(TAG, "Geofence failed to create");
         }
+    }
+
+    private final String KEY_GEOFENCE_LAT = "GEOFENCE LATITUDE";
+    private final String KEY_GEOFENCE_LON = "GEOFENCE LONGITUDE";
+
+    private void saveGeofence() {
+        Log.d(TAG, "saveGeofence()");
+        SharedPreferences sharedPref = getPreferences( Context.MODE_PRIVATE );
+        SharedPreferences.Editor editor = sharedPref.edit();
+
+        editor.putLong( KEY_GEOFENCE_LAT, Double.doubleToRawLongBits( cherryHall.latitude ));
+        editor.putLong( KEY_GEOFENCE_LON, Double.doubleToRawLongBits( cherryHall.longitude ));
+        editor.apply();
     }
 
     private void drawGeofence() {
@@ -311,7 +341,7 @@ public class MapsActivity extends FragmentActivity implements
                 .center(cherryHall)
                 .strokeColor(Color.argb(30, 70, 70, 70))
                 .fillColor(Color.argb(100, 150, 150, 150))
-                .radius(45.0f);
+                .radius(GEOFENCE_RADIUS);
         geoFenceLimits = mMap.addCircle(circleOptions);
 
         mMap.addMarker(new MarkerOptions()
