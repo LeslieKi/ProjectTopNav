@@ -23,7 +23,9 @@ import java.util.List;
 
 public class GeofenceTransitionService extends IntentService {
 
-    protected static final String TAG = "GeofenceTransitionsIS";
+    protected static final String TAG = "GeofenceTransitions";
+    long start4;
+    long end4;
 
     /**
      * This constructor is required, and calls the super IntentService(String)
@@ -36,6 +38,8 @@ public class GeofenceTransitionService extends IntentService {
 
     @Override
     public void onCreate() {
+        Log.i(TAG, "In: GeofenceTransitionService | Method: onCreate()");
+        start4 = System.nanoTime();
         super.onCreate();
     }
 
@@ -46,6 +50,7 @@ public class GeofenceTransitionService extends IntentService {
      */
     @Override
     protected void onHandleIntent(Intent intent) {
+        Log.i(TAG, "In: GeofenceTransitionService | Method: onHandleIntent()");
         GeofencingEvent geofencingEvent = GeofencingEvent.fromIntent(intent);
         if (geofencingEvent.hasError()) {
             String errorMessage = GeofenceErrorMessages.getErrorString(this,
@@ -92,6 +97,7 @@ public class GeofenceTransitionService extends IntentService {
             Context context,
             int geofenceTransition,
             List<Geofence> triggeringGeofences) {
+        Log.i(TAG, "In: GeofenceTransitionService | Method: getGeofenceTransitionDetails()");
 
         String geofenceTransitionString = getTransitionString(geofenceTransition);
 
@@ -110,6 +116,9 @@ public class GeofenceTransitionService extends IntentService {
      * If the user clicks the notification, control goes to the MainActivity.
      */
     private void sendNotification(String notificationDetails) {
+        Log.i(TAG, "In: GeofenceTransitionService | Method: sendNotification()");
+        end4 = System.nanoTime();
+        Log.i(TAG, "Time to determine correct geofence transition = "+(end4-start4)/1000000+ "ms");
         // Create an explicit content Intent that starts the main Activity.
         Intent notificationIntent = new Intent(getApplicationContext(), MapsActivity.class);
 
@@ -149,6 +158,7 @@ public class GeofenceTransitionService extends IntentService {
 
         // Issue the notification
         mNotificationManager.notify(0, builder.build());
+
     }
 
     /**
@@ -158,6 +168,7 @@ public class GeofenceTransitionService extends IntentService {
      * @return                  A String indicating the type of transition
      */
     private String getTransitionString(int transitionType) {
+        Log.i(TAG, "In: GeofenceTransitionService | Method: getTransitionString()");
         switch (transitionType) {
             case Geofence.GEOFENCE_TRANSITION_DWELL:
                 return getString(R.string.geofence_transition_entered);
