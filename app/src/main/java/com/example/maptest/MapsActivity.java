@@ -42,11 +42,11 @@ public class MapsActivity extends FragmentActivity implements
         LocationListener,
         ResultCallback<Status> {
 
+    //timers
     long start;
     long start1;
     long start2;
     long start3;
-
     long end3;
     long end2;
     long end1;
@@ -58,7 +58,6 @@ public class MapsActivity extends FragmentActivity implements
     protected ArrayList<Geofence> mGeofenceList;
 
     private PendingIntent mGeofencePendingIntent;
-
 
     // used to build location request client
     private LocationRequest mLocationRequest;
@@ -72,11 +71,24 @@ public class MapsActivity extends FragmentActivity implements
     // Constant static member to define request code to be sent to Google Play Services
     private final static int CONNECTION_FAILURE_RESOLUTION_REQUEST = 9000;
 
-    private long UPDATE_INTERVAL = 10 * 1000; // 10 seconds, in milliseconds
-    private long FASTEST_INTERVAL = 2000; // 1 second, in milliseconds
+    // variables to set location update interval
+    private long UPDATE_INTERVAL = 30 * 1000; // 30 seconds, in milliseconds
+    private long FASTEST_INTERVAL = 10 * 1000; // 10 second, in milliseconds
 
+    //LatLng object for cherryHall, used for geofence and marker
     private LatLng cherryHall = new LatLng(36.987336, -86.451221);
-    //private LatLng cherryHall = new LatLng(36.988284, -86.459741);
+
+    //sets how long the geofence will exist
+    private static final long GEO_DURATION = 100 * 1000;
+
+    //string that provides the ID for the geofence
+    private static final String GEOFENCE_REQ_ID = "Cherry Hall";
+
+    //the active area for the geofence
+    private static final float GEOFENCE_RADIUS = 50.0f; // in meters
+
+    //circle object that provides a visual reference for the geofence
+    private Circle geoFenceLimits;
 
     protected void onCreate(Bundle savedInstanceState) {
         Log.i(TAG, "In: MapsActivity | Method: onCreate()");
@@ -85,7 +97,6 @@ public class MapsActivity extends FragmentActivity implements
 
         mGeofenceList = new ArrayList<Geofence>();
         mGeofencePendingIntent = null;
-
 
         // Obtain the SupportMapFragment and get notified when the map is ready to be used.
         mapFragment = (SupportMapFragment) getSupportFragmentManager().findFragmentById(map);
@@ -226,7 +237,7 @@ public class MapsActivity extends FragmentActivity implements
         end3 = System.nanoTime();
         Log.i(TAG, "Time to get first location update = "+(end3-start3)/1000000+ "ms");
 
-
+        //move the camera to the user's position
         mMap.moveCamera(CameraUpdateFactory.newLatLng(latLng));
         mMap.moveCamera(CameraUpdateFactory.zoomTo(15));
     }// end onLocationChanged
@@ -259,12 +270,6 @@ public class MapsActivity extends FragmentActivity implements
     /**
      * All of the following code is for building and handling Geofences
      */
-    private static final long GEO_DURATION = 100 * 1000;
-    private static final String GEOFENCE_REQ_ID = "Cherry Hall";
-    private static final float GEOFENCE_RADIUS = 50.0f; // in meters
-
-    private Circle geoFenceLimits;
-
     // Start Geofence creation process
     private void startGeofence() {
         Log.i(TAG, "In: MapsActivity | Method: startGeofence()");
@@ -274,7 +279,7 @@ public class MapsActivity extends FragmentActivity implements
         addGeofence(geofenceRequest);
     }
 
-    // Create a Geofence
+    // Create a Geofence with the builder
     private Geofence createGeofence(LatLng latLng, float radius) {
         Log.d(TAG, "In: MapsActivity | Method: createGeofence()");
         return new Geofence.Builder()
@@ -321,13 +326,14 @@ public class MapsActivity extends FragmentActivity implements
             ).setResultCallback(this);
     }
 
+    //this method is called after the geofence request
+    //determines if the build was successful or not
     public void onResult(@NonNull Status status) {
         Log.i(TAG, "In: MapsActivity | Method: onResult: " + status);
         if (status.isSuccess()) {
             Log.d(TAG, "Geofence was created");
             end = System.nanoTime();
             Log.i(TAG, "Time to create geofence = "+(end-start)/1000000+ "ms");
-
             drawGeofence();
         } else {
             Log.d(TAG, "Geofence failed to create");
@@ -350,6 +356,5 @@ public class MapsActivity extends FragmentActivity implements
         mMap.addMarker(new MarkerOptions()
                 .position(cherryHall)
                 .title("Cherry Hall"));
-
     }
 } // end class MapsActivity
