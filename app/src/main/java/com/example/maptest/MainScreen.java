@@ -12,6 +12,7 @@ import android.widget.Toast;
 
 public class MainScreen extends AppCompatActivity {
 
+    //GG People!
     private static final int LOCATION_PERMISSION_REQUEST_CODE = 1;
     private boolean mPermissionDenied = false;
     public static final String TAG = MainScreen.class.getSimpleName();
